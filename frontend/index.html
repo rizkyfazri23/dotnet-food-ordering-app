@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Pemesanan Makanan</title>
+    <!-- Include Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Aplikasi Pemesanan Makanan</h1>
+        <div class="row">
+            <div class="col-md-6">
+                <input type="text" class="form-control mb-2" id="searchInput" placeholder="Cari makanan...">
+                <div id="searchResults">
+                    <!-- Hasil pencarian akan ditampilkan di sini -->
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h2>Daftar Pesanan</h2>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Nama Makanan</th>
+                            <th>Quantity</th>
+                            <th>Harga Satuan</th>
+                            <th>Sub Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orderList">
+                        <!-- Daftar pesanan akan ditampilkan di sini -->
+                    </tbody>
+                </table>
+                <h4>Total Harga: <span id="totalPrice">0</span></h4>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col">
+                <button class="btn btn-primary" id="submitOrder">Submit Pesanan</button>
+            </div>
+        </div>
+        <div class="row mt-4" id="orderDetailsSection" style="display: none;">
+            <div class="col">
+                <h2>Detail Pesanan</h2>
+                <div id="orderDetails">
+                    <!-- Detail pesanan akan ditampilkan di sini -->
+                </div>
+            </div>
+        </div>
+        <div class="row mt-4" id="paymentSection" style="display: none;">
+            <div class="col">
+                <h2>Detail Pembayaran</h2>
+                <form id="paymentForm">
+                    <div class="mb-3">
+                        <label for="amountInput" class="form-label">Jumlah Pembayaran</label>
+                        <input type="number" class="form-control" id="amountInput" step="0.01" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Konfirmasi Pembayaran</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include Bootstrap JS and your custom JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+    <script>
+        window.addEventListener('load', function () {
+            getAllFood();
+        });
+
+        const orders = [];
+
+        // Fungsi untuk mendapatkan daftar makanan dari backend
+        function getAllFood() {
+            fetch('http://localhost:5175/api/Food/get-all-food') 
+                .then(response => response.json())
+                .then(data => {
+                    const orderList = document.getElementById('orderList');
+                    orderList.innerHTML = ''; 
+
+                    data.forEach((food, index) => {
+                        const foodRow = document.createElement('tr');
+                        foodRow.innerHTML = `
+                            <td>${index + 1}</td>
+                            <td>
+                                <span class="food-name" data-food-description="${food.description}">
+                                    ${food.name}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-minus" data-food-index="${index}">
+                                    -
+                                </button>
+                                <span class="quantity" data-food-index="${index}">0</span>
+                                <button class="btn btn-sm btn-plus" data-food-index="${index}">
+                                    +
+                                </button>
+                            </td>
+                            <td>${food.price}</td>
+                            <td>
+                                <span class="subtotal" data-food-index="${index}">0</span>
+                            </td>
+                        `;
+                        orderList.appendChild(foodRow);
+
+                        // Inisialisasi pesanan untuk setiap makanan
+                        orders.push({
+                            food: food,
+                            quantity: 0,
+                            subtotal: 0
+                        });
+                    });
+
+                    // Tambahkan event listener untuk tombol "-" (Kurang)
+                    const minusButtons = document.querySelectorAll('.btn-minus');
+                    minusButtons.forEach(button => {
+                        button.addEventListener('click', function () {
+                            const foodIndex = this.getAttribute('data-food-index');
+                            reduceQuantity(foodIndex);
+                            updateOrderList();
+                        });
+                    });
+
+                    // Tambahkan event listener untuk tombol "+" (Tambah)
+                    const plusButtons = document.querySelectorAll('.btn-plus');
+                    plusButtons.forEach(button => {
+                        button.addEventListener('click', function () {
+                            const foodIndex = this.getAttribute('data-food-index');
+                            increaseQuantity(foodIndex);
+                            updateOrderList();
+                        });
+                    });
+                })
+                .catch(error => console.error('Error fetching food data:', error));
+        }
+
+         // Fungsi untuk melakukan pencarian makanan
+         document.getElementById('searchInput').addEventListener('input', function () {
+            const searchText = this.value.toLowerCase();
+            const searchResults = document.getElementById('searchResults');
+            searchResults.innerHTML = '';
+
+            fetch('http://localhost:5175/api/Food/get-all-food') // Ganti dengan endpoint yang sesuai
+                .then(response => response.json())
+                .then(data => {
+                    const filteredFoods = data.filter(food => food.name.toLowerCase().includes(searchText));
+                    filteredFoods.forEach(food => {
+                        const foodItem = document.createElement('div');
+                        foodItem.classList.add('mb-2');
+                        foodItem.innerHTML = `
+                            <span class="food-name" data-food-description="${food.description}">
+                                ${food.name} - Harga: ${food.price}
+                            </span>
+                        `;
+                        searchResults.appendChild(foodItem);
+                    });
+
+                    // Tambahkan event listener untuk menampilkan deskripsi saat mengklik makanan
+                    const foodNameSpans = searchResults.querySelectorAll('.food-name');
+                    foodNameSpans.forEach(span => {
+                        span.addEventListener('click', function () {
+                            const description = this.getAttribute('data-food-description');
+                            alert(description);
+                        });
+                    });
+                })
+                .catch(error => console.error('Error fetching food data:', error));
+        });
+
+        // Fungsi untuk mengurangi quantity pesanan
+        function reduceQuantity(foodIndex) {
+            const quantitySpan = document.querySelectorAll('.quantity')[foodIndex];
+            const subtotalSpan = document.querySelectorAll('.subtotal')[foodIndex];
+            const food = orders[foodIndex].food;
+
+            if (orders[foodIndex].quantity > 0) {
+                orders[foodIndex].quantity--;
+                orders[foodIndex].subtotal = orders[foodIndex].quantity * food.price;
+                quantitySpan.textContent = orders[foodIndex].quantity;
+                subtotalSpan.textContent = orders[foodIndex].subtotal;
+            }
+        }
+
+        // Fungsi untuk menambah quantity pesanan
+        function increaseQuantity(foodIndex) {
+            const quantitySpan = document.querySelectorAll('.quantity')[foodIndex];
+            const subtotalSpan = document.querySelectorAll('.subtotal')[foodIndex];
+            const food = orders[foodIndex].food;
+
+            orders[foodIndex].quantity++;
+            orders[foodIndex].subtotal = orders[foodIndex].quantity * food.price;
+            quantitySpan.textContent = orders[foodIndex].quantity;
+            subtotalSpan.textContent = orders[foodIndex].subtotal;
+        }
+
+        // Fungsi untuk memperbarui total harga di halaman
+        function updateTotalPrice() {
+            const totalPriceElement = document.getElementById('totalPrice');
+            let totalPrice = 0;
+            orders.forEach(order => {
+                totalPrice += order.subtotal;
+            });
+            totalPriceElement.textContent = totalPrice;
+        }
+
+        // Fungsi untuk memperbarui daftar pesanan di halaman
+        function updateOrderList() {
+            orders.forEach((order, index) => {
+                const quantitySpan = document.querySelectorAll('.quantity')[index];
+                const subtotalSpan = document.querySelectorAll('.subtotal')[index];
+
+                quantitySpan.textContent = order.quantity;
+                subtotalSpan.textContent = order.subtotal;
+            });
+
+            updateTotalPrice();
+        }
+
+       // Event listener for submitting order
+        const submitOrderButton = document.getElementById('submitOrder');
+        submitOrderButton.addEventListener('click', function () {
+            submitOrder();
+            showOrderDetailsSection(); 
+        });
+
+        function submitOrder() {
+            const orderDetails = orders.filter(order => order.quantity > 0);
+            if (orderDetails.length === 0) {
+                alert('Tambahkan makanan ke dalam pesanan.');
+                return;
+            }
+
+            orderDetails.forEach((orderDetail, index) => {
+                orderDetail.FoodId = orderDetail.food.id; 
+                orderDetail.Quantity = orderDetail.quantity; 
+            });
+
+         
+
+            fetch('http://localhost:5175/api/Food/create-order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(orderDetails)
+            })
+            .then(response => response.json())
+            .then(order => {
+                currentOrderId = order.id;
+                showPaymentSection(order.id); 
+            })
+            .catch(error => console.error('Error submitting order:', error));
+        }
+
+        // Function to show the order details section
+        function showOrderDetailsSection() {
+            const orderDetailsSection = document.getElementById('orderDetailsSection');
+            const orderDetailsElement = document.getElementById('orderDetails');
+            orderDetailsElement.innerHTML = ''; // Clear previous content
+
+            orders.forEach((order, index) => {
+                if (order.quantity > 0) {
+                    const orderItem = document.createElement('p');
+                    orderItem.textContent = `${index + 1}. ${order.food.name} x ${order.quantity}`;
+                    orderDetailsElement.appendChild(orderItem);
+                }
+            });
+
+            orderDetailsSection.style.display = 'block';
+        }
+
+
+
+        // Function to process payment
+        function processPayment(amount) {
+            const paymentData = {
+                orderId: currentOrderId,
+                amount: amount
+            };
+
+            fetch('http://localhost:5175/api/Food/process-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(paymentData)
+            })
+            .then(response => response.json())
+            .then(payment => {
+                alert('Pembayaran berhasil. ID Pembayaran: ' + payment.id);
+            })
+            .catch(error => console.error('Error processing payment:', error));
+        }
+
+        // Function to show payment section and store current order ID
+        let currentOrderId;
+        function showPaymentSection(orderId) {
+            currentOrderId = orderId;
+            document.getElementById('paymentSection').style.display = 'block';
+
+            // Add an event listener to the payment form submission
+            const paymentForm = document.getElementById('paymentForm');
+            paymentForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const amountInput = document.getElementById('amountInput');
+                const amount = parseFloat(amountInput.value);
+                if (isNaN(amount) || amount <= 0) {
+                    alert('Masukkan jumlah pembayaran yang valid.');
+                    return;
+                }
+                processPayment(amount);
+            });
+        }
+    </script>
+</body>
+</html>
